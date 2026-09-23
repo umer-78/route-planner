@@ -359,6 +359,43 @@ svg text { font-family: var(--mono); }
 #map { width: 100%; height: auto; display: block; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); margin-top: 14px; }
 .best { color: var(--good); font-weight: 700; }
 .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+/* === interactive lab === */
+#labMap { touch-action: none; cursor: grab; user-select: none; }
+#labMap.mode-add-node { cursor: crosshair; }
+#labMap.mode-add-edge { cursor: cell; }
+#labMap.mode-del { cursor: not-allowed; }
+.lab-node { cursor: grab; transition: filter 0.2s var(--ease); }
+.lab-node:hover { filter: brightness(1.2); }
+.lab-edge { cursor: pointer; transition: stroke-width 0.15s var(--ease); }
+.lab-edge:hover { stroke-width: 5.5 !important; }
+.frontier-ring { animation: pulse 0.9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.path-glow {
+  stroke-dasharray: 12 7;
+  animation: dashmove 0.9s linear infinite;
+  filter: drop-shadow(0 0 5px currentColor);
+}
+@keyframes dashmove { to { stroke-dashoffset: -38; } }
+.race { display: grid; gap: 10px; margin-top: 14px; }
+.race-lane {
+  display: grid; grid-template-columns: 120px 1fr 110px; gap: 10px;
+  align-items: center; font-size: 13px;
+}
+.race-lane .rl-name { font-weight: 700; font-size: 13px; }
+.race-bar { height: 16px; background: var(--surface-2); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+.race-bar i { display: block; height: 100%; border-radius: 99px; transition: width 0.15s linear; }
+.race-lane .rl-count { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mode-active {
+  background: var(--accent-soft) !important; border-color: var(--accent) !important; color: var(--accent) !important;
+}
+.lab-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.lab-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; align-items: center; }
+.lab-tools button { font-size: 13px; padding: 6px 13px; font-weight: 500; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); }
+.lab-tools button:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.lab-tools button.primary { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #7c3aed)); color: #fff; border-color: transparent; }
+.lab-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.lab-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.warn-note { color: var(--warn); font-size: 13px; margin-top: 8px; font-weight: 600; }
+@media (max-width: 560px) { .race-lane { grid-template-columns: 90px 1fr; } .race-lane .rl-count { grid-column: 1 / -1; text-align: left; } }
   </style>
 </head>
 <body>
@@ -428,6 +465,75 @@ svg text { font-family: var(--mono); }
 astar, fastest
   50.19 km, 34.4 minutes, 22 segments
   1,141 expanded, 1,443 pushed, 4,202 relaxed, peak frontier 208</div>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-num">4</span> Interactive search lab</h2>
+      <p class="muted" style="margin-top:0">Drag nodes to reshape the graph, then watch Dijkstra, A* and bidirectional search expand node by node. Nodes are tinted by f(n) = g(n) + h(n) — the priority each algorithm pops from its frontier. Build your own graph with the tools below.</p>
+      <div class="row" style="margin-bottom:6px">
+        <div>
+          <label for="labStart">Start</label>
+          <select id="labStart"></select>
+        </div>
+        <div>
+          <label for="labGoal">Goal</label>
+          <select id="labGoal"></select>
+        </div>
+        <div>
+          <label for="labSpeed">Animation speed <span class="mono" id="labSpeedV">90</span> ms</label>
+          <input type="range" id="labSpeed" min="30" max="400" step="10" value="90">
+        </div>
+        <div>
+          <label for="labAlgo">Algorithm</label>
+          <select id="labAlgo">
+            <option value="astar">A*</option>
+            <option value="dijkstra">Dijkstra</option>
+            <option value="bidirectional">Bidirectional</option>
+            <option value="race">Race all three</option>
+          </select>
+        </div>
+      </div>
+      <div class="lab-tools">
+        <button class="primary" id="labPlay">▶ Play</button>
+        <button id="labStep">Step</button>
+        <button id="labReset">Reset</button>
+        <button id="labModeMove" class="mode-active">✋ Move nodes</button>
+        <button id="labModeAddN">＋ Node</button>
+        <button id="labModeAddE">⌒ Edge</button>
+        <button id="labModeDel">✕ Delete</button>
+        <button id="labRandomize">Randomize graph</button>
+        <button id="labDemoDead">Dead-end demo</button>
+        <button id="labDemoNoPath">No-path demo</button>
+        <button id="labDemoOwn">Construct own</button>
+      </div>
+      <div class="presets">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--text-secondary)"><input type="checkbox" id="showF" checked> color by f(n)</label>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--text-secondary)"><input type="checkbox" id="showFrontier" checked> show frontier</label>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--text-secondary)"><input type="checkbox" id="showExpanded" checked> show expanded</label>
+      </div>
+      <svg id="labMap" viewBox="0 0 520 420" role="img" aria-label="Interactive graph for step-by-step search animation"></svg>
+      <div class="lab-legend" id="labLegend"></div>
+      <div class="stats" id="labStats" aria-live="polite"></div>
+      <div id="labOut" class="result-box">Press Play or Step to animate the search.</div>
+      <div id="admissWarn" class="warn-note" hidden></div>
+      <div class="race" id="racePanel" hidden>
+        <div class="race-lane"><span class="rl-name" style="color:var(--bad)">Dijkstra</span><div class="race-bar"><i id="raceBarD" style="width:0%;background:linear-gradient(90deg,var(--bad),#f97316)"></i></div><span class="rl-count" id="raceCntD">0 expanded</span></div>
+        <div class="race-lane"><span class="rl-name" style="color:var(--good)">A*</span><div class="race-bar"><i id="raceBarA" style="width:0%;background:linear-gradient(90deg,var(--good),#06b6d4)"></i></div><span class="rl-count" id="raceCntA">0 expanded</span></div>
+        <div class="race-lane"><span class="rl-name" style="color:var(--warn)">Bidirectional</span><div class="race-bar"><i id="raceBarB" style="width:0%;background:linear-gradient(90deg,var(--warn),#eab308)"></i></div><span class="rl-count" id="raceCntB">0 expanded</span></div>
+      </div>
+      <p class="lab-hint" id="labHint">Move mode: drag nodes. Edge mode: click two nodes to connect them (weight = euclidean distance × random factor). Delete: click a node or edge. Double-click an edge to set its weight.</p>
+    </section>
+
+    <section class="card">
+      <h2><span class="section-num">5</span> Path comparison table</h2>
+      <p class="muted" style="margin-top:0">Real numbers from the lab run: distance, estimated travel time, nodes expanded and whether each algorithm found the optimal path.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>algorithm</th><th>distance</th><th>time est.</th><th>nodes expanded</th><th>frontier peak</th><th>optimal?</th></tr></thead>
+          <tbody id="labCmpBody"><tr><td colspan="6" class="muted">Run the lab to fill this table.</td></tr></tbody>
+        </table>
+      </div>
+      <div id="labCmpNote" class="muted" style="margin-top:10px"></div>
     </section>
 
     <footer>69 tests · Python 3.10–3.12 · standard library only · Built by <a href="https://github.com/umer-78">Umer Hashmi</a></footer>
@@ -785,6 +891,579 @@ astar, fastest
       $(id).addEventListener('change', () => { drawMap({}); run(); }));
     drawMap({});
     run();
+
+    // ============================================================
+    // INTERACTIVE SEARCH LAB — step traces, race, graph builder
+    // ============================================================
+    const LNS = 'http://www.w3.org/2000/svg';
+    let labNodes = {};   // id -> {id, x, y}
+    let labEdges = [];   // {u, v, w}
+    let labSeq = 0;
+    let labMode = 'move';
+    let labTrace = { dijkstra: [], astar: [], bidirectional: [] }; // arrays of frames
+    let labStepIdx = { dijkstra: 0, astar: 0, bidirectional: 0 };
+    let labTimer = null;
+    let labSelectedEdge = null;
+    let dragNode = null;
+    let edgeFirst = null;
+
+    const LAB_COLORS = { dijkstra: 'var(--bad)', astar: 'var(--good)', bidirectional: 'var(--warn)' };
+
+    function labH(a, b) { // euclidean heuristic in same units as edge weights (px/20)
+      const p = labNodes[a], q = labNodes[b];
+      return Math.hypot(p.x - q.x, p.y - q.y) / 20;
+    }
+    function labAdj() {
+      const adj = {};
+      for (const id in labNodes) adj[id] = [];
+      for (const e of labEdges) {
+        adj[e.u].push({ v: e.v, w: e.w });
+        adj[e.v].push({ v: e.u, w: e.w });
+      }
+      return adj;
+    }
+    function labConnected() {
+      const adj = labAdj();
+      const ids = Object.keys(labNodes);
+      if (!ids.length) return false;
+      const seen = new Set([ids[0]]); const q = [ids[0]];
+      while (q.length) { const u = q.pop(); for (const e of adj[u]) if (!seen.has(e.v)) { seen.add(e.v); q.push(e.v); } }
+      return seen.size === ids.length;
+    }
+
+    // Build a full trace: frames = {expanded:Set-like array, frontier:[{id,pri}], dist:{}, prev:{}, popped, done:bool, path}
+    function buildTrace(start, goal, algo) {
+      const adj = labAdj();
+      const useH = algo !== 'dijkstra';
+      const dist = { [start]: 0 }, prev = {}, done = new Set();
+      const frames = [];
+      // simple priority queue as array (graphs are small)
+      const pq = [{ id: start, pri: useH ? labH(start, goal) : 0 }];
+      const push = (id, pri) => { pq.push({ id, pri }); pq.sort((a, b) => a.pri - b.pri); };
+      const snapshot = (popped, finished) => {
+        frames.push({
+          popped,
+          expanded: [...done],
+          frontier: pq.map(x => ({ id: x.id, pri: x.pri })),
+          dist: Object.assign({}, dist),
+          done: finished
+        });
+      };
+      snapshot(null, false);
+      if (algo === 'bidirectional') {
+        // two uniform-cost frontiers expanding alternately until they meet
+        const distB = { [goal]: 0 }, prevB = {}, doneB = new Set();
+        const pqB = [{ id: goal, pri: 0 }];
+        const pushB = (id, pri) => { pqB.push({ id, pri }); pqB.sort((a, b) => a.pri - b.pri); };
+        let meet = null;
+        let guard = 0;
+        const snapBi = (popped) => {
+          frames.push({
+            popped,
+            expanded: [...new Set([...done, ...doneB])],
+            frontier: pq.map(x => ({ id: x.id, pri: x.pri })).concat(pqB.map(x => ({ id: x.id, pri: x.pri }))),
+            dist: Object.assign({}, dist),
+            done: false
+          });
+        };
+        snapBi(null);
+        while ((pq.length || pqB.length) && guard++ < 800) {
+          let popped = null;
+          if (pq.length) {
+            const cur = pq.shift();
+            if (!done.has(cur.id)) {
+              done.add(cur.id); popped = cur.id;
+              for (const e of adj[cur.id] || []) {
+                const nd = dist[cur.id] + e.w;
+                if (dist[e.v] === undefined || nd < dist[e.v] - 1e-12) { dist[e.v] = nd; prev[e.v] = cur.id; push(e.v, nd); }
+              }
+              if (doneB.has(cur.id)) { meet = cur.id; snapBi(popped); break; }
+            }
+          }
+          if (pqB.length && meet === null) {
+            const cur = pqB.shift();
+            if (!doneB.has(cur.id)) {
+              doneB.add(cur.id); popped = popped || cur.id;
+              for (const e of adj[cur.id] || []) {
+                const nd = distB[cur.id] + e.w;
+                if (distB[e.v] === undefined || nd < distB[e.v] - 1e-12) { distB[e.v] = nd; prevB[e.v] = cur.id; pushB(e.v, nd); }
+              }
+              if (dist[cur.id] !== undefined) { meet = cur.id; }
+            }
+          }
+          if (popped) snapBi(popped);
+          if (meet !== null) break;
+        }
+        const path = [];
+        if (meet) {
+          const head = []; let c = meet;
+          while (c !== start && prev[c] !== undefined) { head.unshift({ u: prev[c], v: c }); c = prev[c]; }
+          const tail = []; let b = meet;
+          while (b !== goal && prevB[b] !== undefined) { tail.push({ u: b, v: prevB[b] }); b = prevB[b]; }
+          frames.push({ popped: meet, expanded: [...new Set([...done, ...doneB])], frontier: [], dist: Object.assign({}, dist), done: true, path: head.concat(tail) });
+        } else {
+          frames.push({ popped: null, expanded: [...new Set([...done, ...doneB])], frontier: [], dist: Object.assign({}, dist), done: true, path: [] });
+        }
+        return frames;
+      }
+      while (pq.length) {
+        const cur = pq.shift();
+        if (done.has(cur.id)) continue;
+        done.add(cur.id);
+        if (cur.id === goal) { snapshot(cur.id, true); break; }
+        for (const e of adj[cur.id]) {
+          const nd = dist[cur.id] + e.w;
+          if (dist[e.v] === undefined || nd < dist[e.v] - 1e-12) { dist[e.v] = nd; prev[e.v] = cur.id; push(e.v, useH ? nd + labH(e.v, goal) : nd); }
+        }
+        snapshot(cur.id, false);
+        if (done.size > 400) break;
+      }
+      // reconstruct
+      const path = [];
+      if (dist[goal] !== undefined) {
+        let c = goal;
+        while (c !== start && prev[c] !== undefined) { path.unshift({ u: prev[c], v: c }); c = prev[c]; }
+      }
+      const last = frames[frames.length - 1];
+      if (last) { last.done = true; last.path = path; last.popped = path.length ? goal : last.popped; }
+      return frames;
+    }
+
+    function labAlgos() {
+      const sel = $('labAlgo').value;
+      return sel === 'race' ? ['dijkstra', 'astar', 'bidirectional'] : [sel];
+    }
+
+    function labRebuildTraces() {
+      const start = $('labStart').value, goal = $('labGoal').value;
+      labTrace = { dijkstra: [], astar: [], bidirectional: [] };
+      labStepIdx = { dijkstra: 0, astar: 0, bidirectional: 0 };
+      if (!labNodes[start] || !labNodes[goal] || start === goal) return;
+      for (const a of labAlgos()) labTrace[a] = buildTrace(start, goal, a);
+      updateLabCmp();
+      if (typeof checkAdmissibility === 'function') checkAdmissibility();
+    }
+
+    function updateLabCmp() {
+      const start = $('labStart').value, goal = $('labGoal').value;
+      const rows = [];
+      const costs = {};
+      for (const a of ['dijkstra', 'astar', 'bidirectional']) {
+        const tr = labTrace[a];
+        if (!tr || !tr.length) continue;
+        const fin = tr[tr.length - 1];
+        let cost = null, timeMin = null, hops = 0;
+        if (fin.path && fin.path.length) {
+          cost = 0; hops = fin.path.length;
+          for (const s of fin.path) {
+            const e = labEdges.find(x => (x.u === s.u && x.v === s.v) || (x.u === s.v && x.v === s.u));
+            if (e) cost += e.w;
+          }
+          timeMin = cost; // weights are distance-like; at a flat 60 km/h, minutes = km
+        }
+        costs[a] = cost;
+        rows.push({ a, cost, timeMin, hops, expanded: tr.length - 1, peak: Math.max(...tr.map(f => f.frontier.length), 0), found: cost !== null });
+      }
+      const best = Math.min(...rows.filter(r => r.found).map(r => r.cost), Infinity);
+      const unit = 'km';
+      $('labCmpBody').innerHTML = rows.length ? rows.map(r => {
+        const optimal = r.found && Math.abs(r.cost - best) < 1e-9;
+        return `<tr>
+          <td><span style="color:${LAB_COLORS[r.a]};font-weight:700">●</span> ${r.a}</td>
+          <td class="mono ${optimal ? 'best' : ''}">${r.found ? fmt(r.cost) + ' ' + unit : 'no path'}</td>
+          <td class="mono">${r.found ? fmt(r.timeMin, 1) + ' min' : '—'}</td>
+          <td class="mono">${fmtInt(r.expanded)}</td>
+          <td class="mono">${fmtInt(r.peak)}</td>
+          <td>${r.found ? (optimal ? '<span class="badge ok">optimal</span>' : '<span class="badge risk">suboptimal</span>') : '<span class="badge warn">unreachable</span>'}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" class="muted">No trace — pick a valid start/goal pair.</td></tr>';
+      const d = rows.find(r => r.a === 'dijkstra'), ast = rows.find(r => r.a === 'astar');
+      if (d && ast && d.found && ast.found) {
+        $('labCmpNote').textContent = `A* expanded ${ast.expanded} nodes vs Dijkstra's ${d.expanded} — same optimal cost (${fmt(d.cost)} km) with an admissible euclidean heuristic.`;
+      } else $('labCmpNote').textContent = '';
+    }
+
+    function fColor(f, maxF) {
+      if (!isFinite(f) || maxF <= 0) return 'var(--surface-3)';
+      const t = Math.min(1, f / maxF);
+      // blue (low f) → orange (high f)
+      const r = Math.round(37 + t * 217), g = Math.round(99 - t * 40), b = Math.round(235 - t * 190);
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function drawLab() {
+      const svg = $('labMap');
+      svg.innerHTML = '';
+      const start = $('labStart').value, goal = $('labGoal').value;
+      const algos = labAlgos();
+      const showF = $('showF').checked, showFr = $('showFrontier').checked, showEx = $('showExpanded').checked;
+
+      // edges
+      for (const e of labEdges) {
+        const a = labNodes[e.u], b = labNodes[e.v];
+        if (!a || !b) continue;
+        const line = document.createElementNS(LNS, 'line');
+        line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+        line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+        line.setAttribute('stroke', 'var(--border-strong)');
+        line.setAttribute('stroke-width', 2);
+        line.setAttribute('opacity', '0.8');
+        line.classList.add('lab-edge');
+        line.dataset.eu = e.u; line.dataset.ev = e.v;
+        line.addEventListener('dblclick', (ev) => {
+          ev.preventDefault();
+          const w = prompt('Edge weight (km):', e.w.toFixed(2));
+          if (w !== null && !isNaN(parseFloat(w)) && parseFloat(w) > 0) { e.w = parseFloat(w); labRebuildTraces(); labStop(); drawLab(); }
+        });
+        line.addEventListener('click', () => {
+          if (labMode === 'del') {
+            labEdges = labEdges.filter(x => x !== e);
+            labRebuildTraces(); labStop(); drawLab();
+          }
+        });
+        svg.appendChild(line);
+        // weight label
+        const mid = document.createElementNS(LNS, 'text');
+        mid.setAttribute('x', (a.x + b.x) / 2); mid.setAttribute('y', (a.y + b.y) / 2 - 4);
+        mid.setAttribute('text-anchor', 'middle'); mid.setAttribute('font-size', '10');
+        mid.setAttribute('fill', 'var(--muted)'); mid.textContent = e.w.toFixed(1);
+        svg.appendChild(mid);
+      }
+
+      // collect per-frame state for each algo at current step
+      const state = {};
+      let maxF = 1;
+      for (const a of algos) {
+        const tr = labTrace[a] || [];
+        const idx = Math.min(labStepIdx[a], tr.length - 1);
+        const fr = tr[idx];
+        state[a] = fr;
+        if (fr && showF) for (const id of Object.keys(fr.dist)) { const f = fr.dist[id] + labH(id, goal); if (f > maxF) maxF = f; }
+      }
+
+      // path glow (from any finished algo)
+      for (const a of algos) {
+        const fr = state[a];
+        if (!fr || !fr.path || !fr.path.length) continue;
+        for (const seg of fr.path) {
+          const p = labNodes[seg.u], q = labNodes[seg.v];
+          if (!p || !q) continue;
+          const line = document.createElementNS(LNS, 'line');
+          line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+          line.setAttribute('x2', q.x); line.setAttribute('y2', q.y);
+          line.setAttribute('stroke', LAB_COLORS[a]);
+          line.setAttribute('stroke-width', 4.5);
+          line.setAttribute('stroke-linecap', 'round');
+          line.classList.add('path-glow');
+          line.style.color = LAB_COLORS[a];
+          svg.appendChild(line);
+        }
+      }
+
+      // nodes
+      for (const id in labNodes) {
+        const n = labNodes[id];
+        const isStart = id === start, isEnd = id === goal;
+        // determine fill from f(n) or frontier/expanded
+        let fill = 'var(--surface)', r = 7;
+        const layers = [];
+        for (const a of algos) {
+          const fr = state[a];
+          if (!fr) continue;
+          const inExpanded = fr.expanded.includes(id);
+          const inFrontier = fr.frontier.some(x => x.id === id);
+          if (showEx && inExpanded) layers.push({ a, kind: 'expanded' });
+          if (showFr && inFrontier) layers.push({ a, kind: 'frontier' });
+          if (fr.popped === id) layers.push({ a, kind: 'popped' });
+        }
+        if (showF && state[algos[0]]) {
+          const fr = state[algos[0]];
+          if (fr.dist[id] !== undefined) fill = fColor(fr.dist[id] + labH(id, goal), maxF);
+        }
+        if (layers.length && !showF) {
+          const top = layers[layers.length - 1];
+          fill = top.kind === 'expanded' ? 'var(--surface-3)' : LAB_COLORS[top.a];
+          r = top.kind === 'popped' ? 10 : 8;
+        } else if (layers.length) {
+          r = 9;
+        }
+        const c = document.createElementNS(LNS, 'circle');
+        c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', isStart || isEnd ? 10 : r);
+        c.setAttribute('fill', isStart ? 'var(--good)' : isEnd ? 'var(--bad)' : fill);
+        c.setAttribute('stroke', layers.some(l => l.kind === 'popped') ? 'var(--accent)' : 'var(--text)');
+        c.setAttribute('stroke-width', layers.some(l => l.kind === 'popped') ? 3 : 1.5);
+        c.classList.add('lab-node');
+        c.dataset.node = id;
+        if (layers.some(l => l.kind === 'frontier')) {
+          const ring = document.createElementNS(LNS, 'circle');
+          ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', r + 5);
+          ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', LAB_COLORS[layers[layers.length-1].a]);
+          ring.setAttribute('stroke-width', 2); ring.setAttribute('opacity', '0.7');
+          ring.classList.add('frontier-ring');
+          svg.appendChild(ring);
+        }
+        svg.appendChild(c);
+        if (isStart || isEnd) {
+          const t = document.createElementNS(LNS, 'text');
+          t.setAttribute('x', n.x); t.setAttribute('y', n.y - 15);
+          t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '10');
+          t.setAttribute('fill', 'var(--text)'); t.textContent = isStart ? 'start' : 'goal';
+          svg.appendChild(t);
+        }
+        // edge-first highlight for edge mode
+        if (edgeFirst === id) {
+          const hl = document.createElementNS(LNS, 'circle');
+          hl.setAttribute('cx', n.x); hl.setAttribute('cy', n.y); hl.setAttribute('r', 14);
+          hl.setAttribute('fill', 'none'); hl.setAttribute('stroke', 'var(--accent)');
+          hl.setAttribute('stroke-width', 2.5); hl.setAttribute('stroke-dasharray', '4 3');
+          svg.appendChild(hl);
+        }
+      }
+
+      // stats
+      const statsHtml = algos.map(a => {
+        const fr = state[a];
+        const tr = labTrace[a] || [];
+        const doneFlag = fr && fr.done;
+        const expanded = fr ? fr.expanded.length : 0;
+        const frontier = fr ? fr.frontier.length : 0;
+        return `<span class="stat"><span class="k">${a}</span><span class="v ${doneFlag ? 'good' : 'accent'}">${doneFlag ? '✓ done' : 'step ' + labStepIdx[a] + '/' + Math.max(tr.length - 1, 0)}</span><span class="v" style="font-size:13px">exp ${expanded} · frontier ${frontier}</span></span>`;
+      }).join('');
+      $('labStats').innerHTML = statsHtml;
+
+      // race bars
+      if ($('labAlgo').value === 'race') {
+        $('racePanel').hidden = false;
+        const maxLen = Math.max(...['dijkstra','astar','bidirectional'].map(a => (labTrace[a] || []).length), 1);
+        const map = { dijkstra: ['raceBarD','raceCntD'], astar: ['raceBarA','raceCntA'], bidirectional: ['raceBarB','raceCntB'] };
+        for (const a of ['dijkstra','astar','bidirectional']) {
+          const [bar, cnt] = map[a];
+          const idx = labStepIdx[a];
+          const pct = Math.min(100, (idx / Math.max(maxLen - 1, 1)) * 100);
+          $(bar).style.width = pct + '%';
+          const fr = (labTrace[a] || [])[idx];
+          $(cnt).textContent = `${fr ? fr.expanded.length : 0} expanded`;
+        }
+      } else $('racePanel').hidden = true;
+
+      // out text
+      const lines = [];
+      for (const a of algos) {
+        const fr = state[a];
+        if (!fr) continue;
+        if (fr.done && fr.path && fr.path.length) {
+          lines.push(`${a.padEnd(15)} path: ${fr.path.map(s => s.u + '→' + s.v).join(', ')}`);
+        } else if (fr.done) {
+          lines.push(`${a.padEnd(15)} no path found`);
+        } else {
+          lines.push(`${a.padEnd(15)} popped ${fr.popped || '—'} · f frontier=[${fr.frontier.slice(0,5).map(x => x.id + ':' + x.pri.toFixed(1)).join(' ')}]`);
+        }
+      }
+      $('labOut').textContent = lines.join('\n') || '—';
+
+      // legend
+      $('labLegend').innerHTML = algos.map(a =>
+        `<span><i style="background:${LAB_COLORS[a]}"></i>${a}</span>`).join('') +
+        (showF ? '<span><i style="background:linear-gradient(90deg,rgb(37,99,235),rgb(254,59,45))"></i>f(n): low → high</span>' : '');
+    }
+
+    function labAdvance() {
+      const algos = labAlgos();
+      let allDone = true;
+      for (const a of algos) {
+        const tr = labTrace[a] || [];
+        if (labStepIdx[a] < tr.length - 1) { labStepIdx[a]++; allDone = false; }
+      }
+      drawLab();
+      if (allDone) labStop();
+      return allDone;
+    }
+    function labStop() { if (labTimer) { clearInterval(labTimer); labTimer = null; $('labPlay').textContent = '▶ Play'; } }
+    function labPlay() {
+      if (labTimer) { labStop(); return; }
+      $('labPlay').textContent = '⏸ Pause';
+      const ms = parseInt($('labSpeed').value, 10);
+      labTimer = setInterval(() => { if (labAdvance()) labStop(); }, ms);
+    }
+
+    // graph construction tools
+    function svgPoint(evt) {
+      const svg = $('labMap');
+      const pt = svg.createSVGPoint();
+      pt.x = evt.clientX; pt.y = evt.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    function setLabMode(m) {
+      labMode = m; edgeFirst = null;
+      ['Move','AddN','AddE','Del'].forEach(k => {
+        $('labMode' + k).classList.toggle('mode-active',
+          (k === 'Move' && m === 'move') || (k === 'AddN' && m === 'addn') || (k === 'AddE' && m === 'adde') || (k === 'Del' && m === 'del'));
+      });
+      const svg = $('labMap');
+      svg.classList.toggle('mode-add-node', m === 'addn');
+      svg.classList.toggle('mode-add-edge', m === 'adde');
+      svg.classList.toggle('mode-del', m === 'del');
+      drawLab();
+    }
+
+    function initLabGraph() {
+      labNodes = {}; labEdges = []; labSeq = 0;
+      // default: copy of main grid positions scaled into 520x420
+      const ids = nodeIds;
+      ids.forEach((id, i) => {
+        const r = Math.floor(i / GRID), c = i % GRID;
+        labNodes[id] = { id, x: 70 + c * 95, y: 60 + r * 78 };
+      });
+      const seen = new Set();
+      for (const e of edges) {
+        const k = [e.u, e.v].sort().join('-');
+        if (seen.has(k)) continue; seen.add(k);
+        // weight in "km": scaled pixel length (keeps euclidean px heuristic admissible: w = px/20 ≥ h contribution)
+        const a = labNodes[e.u], b = labNodes[e.v];
+        const px = Math.hypot(a.x - b.x, a.y - b.y);
+        labEdges.push({ u: e.u, v: e.v, w: +(px / 20).toFixed(2) });
+      }
+    }
+    function refreshLabSelects() {
+      const ids = Object.keys(labNodes);
+      const s = $('labStart'), g = $('labGoal');
+      const prevS = s.value, prevG = g.value;
+      s.innerHTML = ''; g.innerHTML = '';
+      for (const id of ids) {
+        const o1 = document.createElement('option'); o1.value = id; o1.textContent = id;
+        const o2 = o1.cloneNode(true);
+        s.appendChild(o1); g.appendChild(o2);
+      }
+      s.value = labNodes[prevS] ? prevS : ids[0];
+      g.value = labNodes[prevG] ? prevG : ids[ids.length - 1];
+    }
+
+    // no-path demo: isolate a node by deleting its edges; dead-end: chain graph
+    function demoNoPath() {
+      labStop();
+      initLabGraph();
+      // remove all edges from start candidate → guarantee no path to goal
+      const ids = Object.keys(labNodes);
+      const a = ids[0], b = ids[ids.length - 1];
+      labEdges = labEdges.filter(e => e.u !== a && e.v !== a);
+      refreshLabSelects();
+      $('labStart').value = a; $('labGoal').value = b;
+      $('labAlgo').value = 'race';
+      labRebuildTraces(); drawLab();
+      $('labOut').textContent = `No-path demo: ${a} is isolated — every algorithm reports unreachable after exhausting the frontier.`;
+    }
+    function demoDeadEnd() {
+      labStop();
+      initLabGraph();
+      // create a dead-end spur: add node hanging off n22 with single edge, start there
+      const spur = 'X' + (++labSeq);
+      labNodes[spur] = { id: spur, x: 260, y: 210 };
+      labEdges.push({ u: spur, v: 'n22', w: +(Math.hypot(labNodes[spur].x - labNodes['n22'].x, labNodes[spur].y - labNodes['n22'].y) / 20).toFixed(2) });
+      refreshLabSelects();
+      $('labStart').value = spur; $('labGoal').value = 'n00';
+      $('labAlgo').value = 'race';
+      labRebuildTraces(); drawLab();
+      $('labOut').textContent = `Dead-end demo: start at ${spur} — the only way out is back through n22; watch the frontier double back.`;
+    }
+    function demoOwn() {
+      labStop();
+      labNodes = {}; labEdges = []; labSeq = 0;
+      setLabMode('addn');
+      refreshLabSelects();
+      labRebuildTraces(); drawLab();
+      $('labOut').textContent = 'Construct-your-own mode: click the canvas to add nodes, then switch to Edge mode and click two nodes to connect them.';
+    }
+
+    // events
+    $('labPlay').addEventListener('click', labPlay);
+    $('labStep').addEventListener('click', () => { labStop(); labAdvance(); });
+    $('labReset').addEventListener('click', () => { labStop(); labRebuildTraces(); drawLab(); });
+    $('labModeMove').addEventListener('click', () => setLabMode('move'));
+    $('labModeAddN').addEventListener('click', () => setLabMode('addn'));
+    $('labModeAddE').addEventListener('click', () => setLabMode('adde'));
+    $('labModeDel').addEventListener('click', () => setLabMode('del'));
+    $('labDemoDead').addEventListener('click', demoDeadEnd);
+    $('labDemoNoPath').addEventListener('click', demoNoPath);
+    $('labDemoOwn').addEventListener('click', demoOwn);
+    $('labRandomize').addEventListener('click', () => {
+      labStop();
+      for (const e of labEdges) {
+        const a = labNodes[e.u], b = labNodes[e.v];
+        e.w = +((Math.hypot(a.x - b.x, a.y - b.y) / 20) * (1 + Math.random())).toFixed(2);
+      }
+      labRebuildTraces(); drawLab();
+    });
+    $('labSpeed').addEventListener('input', () => {
+      $('labSpeedV').textContent = $('labSpeed').value;
+      if (labTimer) { labStop(); labPlay(); }
+    });
+    ['labAlgo', 'labStart', 'labGoal'].forEach(id => $(id).addEventListener('change', () => {
+      labStop(); labRebuildTraces(); drawLab();
+    }));
+    ['showF', 'showFrontier', 'showExpanded'].forEach(id => $(id).addEventListener('change', drawLab));
+
+    // pointer interactions on lab SVG
+    const labSvg = $('labMap');
+    labSvg.addEventListener('pointerdown', (ev) => {
+      const t = ev.target;
+      if (labMode === 'move' && t.dataset && t.dataset.node) {
+        dragNode = t.dataset.node;
+        labSvg.setPointerCapture(ev.pointerId);
+        labStop();
+        return;
+      }
+      if (labMode === 'addn' && t === labSvg) {
+        const p = svgPoint(ev);
+        const id = 'U' + (++labSeq);
+        labNodes[id] = { id, x: Math.round(p.x), y: Math.round(p.y) };
+        refreshLabSelects(); labRebuildTraces(); drawLab();
+        return;
+      }
+      if (labMode === 'adde' && t.dataset && t.dataset.node) {
+        const id = t.dataset.node;
+        if (!edgeFirst) { edgeFirst = id; drawLab(); }
+        else if (edgeFirst !== id) {
+          const exists = labEdges.some(e => (e.u === edgeFirst && e.v === id) || (e.u === id && e.v === edgeFirst));
+          if (!exists) {
+            const a = labNodes[edgeFirst], b = labNodes[id];
+            labEdges.push({ u: edgeFirst, v: id, w: +(Math.hypot(a.x - b.x, a.y - b.y) / 20).toFixed(2) });
+          }
+          edgeFirst = null;
+          labRebuildTraces(); drawLab();
+        }
+        return;
+      }
+      if (labMode === 'del' && t.dataset && t.dataset.node) {
+        const id = t.dataset.node;
+        delete labNodes[id];
+        labEdges = labEdges.filter(e => e.u !== id && e.v !== id);
+        refreshLabSelects(); labRebuildTraces(); drawLab();
+      }
+    });
+    labSvg.addEventListener('pointermove', (ev) => {
+      if (!dragNode) return;
+      const p = svgPoint(ev);
+      labNodes[dragNode].x = Math.max(20, Math.min(500, p.x));
+      labNodes[dragNode].y = Math.max(25, Math.min(400, p.y));
+      drawLab();
+    });
+    labSvg.addEventListener('pointerup', () => { dragNode = null; });
+    labSvg.addEventListener('pointercancel', () => { dragNode = null; });
+
+    // admissibility warning: flag suspiciously tiny weights
+    function checkAdmissibility() {
+      const warn = $('admissWarn');
+      const tiny = labEdges.filter(e => e.w < 0.5);
+      if (tiny.length) { warn.hidden = false; warn.textContent = `⚠ ${tiny.length} edge(s) have weight < 0.5 km — with the euclidean pixel heuristic this can make A* inadmissible and suboptimal.`; }
+      else warn.hidden = true;
+    }
+
+    // init
+    initLabGraph();
+    refreshLabSelects();
+    $('labStart').value = 'n00'; $('labGoal').value = 'n44';
+    labRebuildTraces();
+    drawLab();
   </script>
 </body>
 </html>
