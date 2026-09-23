@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>routeplanner — Route Planner Demo</title>
+  <meta name="description" content="Interactive demo of Dijkstra, A* and bidirectional search over a small road network with shortest and fastest cost models.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='monospace'>↗</text></svg>">
+  <style>
+    :root {
+      --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f4; --border: #dde1e8;
+      --text: #16181d; --muted: #5d6573; --accent: #2563eb; --accent-ink: #ffffff;
+      --good: #15803d; --bad: #b91c1c; --radius: 12px;
+      --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 4px 16px rgb(16 24 40 / 0.05);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1116; --surface: #161a21; --surface-2: #1d222b; --border: #2a303b;
+        --text: #e8eaee; --muted: #9aa3b2; --accent: #60a5fa; --accent-ink: #0b1220;
+        --good: #4ade80; --bad: #f87171; --shadow: none; color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    header.top h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    header.top p { margin: 2px 0 0; color: var(--muted); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; margin: 0 0 12px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input, select, textarea, button { font: inherit; color: inherit; }
+    input, select, textarea {
+      width: 100%; padding: 9px 11px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--surface-2); outline: none; min-width: 0;
+    }
+    input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      cursor: pointer; border: 1px solid var(--border); background: var(--surface-2);
+      padding: 9px 14px; border-radius: 9px; font-weight: 600;
+    }
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .row > * { flex: 1 1 160px; }
+    .row > button { flex: 0 0 auto; }
+    .muted { color: var(--muted); }
+    .mono { font-family: var(--mono); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .table-wrap { overflow-x: auto; }
+    .result-box { font-family: var(--mono); font-size: 14px; padding: 12px; background: var(--surface-2); border-radius: 8px; margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
+    footer { margin-top: 32px; color: var(--muted); font-size: 13px; text-align: center; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+    .stat { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; min-width: 110px; }
+    .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat .v { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+    .algo-pick { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .algo-pick label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; color: var(--text); cursor: pointer; }
+    svg text { font-family: var(--mono); }
+    #map { width: 100%; height: auto; display: block; border-radius: 8px; background: var(--surface-2); }
+    .best { color: var(--good); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>routeplanner</h1>
+        <p>Dijkstra, A* and bidirectional search over one implementation — pick two nodes and compare them live.</p>
+      </div>
+      <a href="https://github.com/umer-78/route-planner">Source on GitHub</a>
+    </header>
+
+    <section class="card">
+      <h2>Plan a route</h2>
+      <p class="muted" style="margin-top:0">A 5×5 road network: local streets at 35 km/h, arterials at 60, a ring motorway at 100. Each edge stores length and speed separately, so shortest and fastest genuinely disagree.</p>
+      <div class="row" style="margin-bottom:10px">
+        <div>
+          <label for="startSel">Start node</label>
+          <select id="startSel"></select>
+        </div>
+        <div>
+          <label for="endSel">End node</label>
+          <select id="endSel"></select>
+        </div>
+        <div>
+          <label for="costSel">Cost model</label>
+          <select id="costSel">
+            <option value="length">shortest (km)</option>
+            <option value="time">fastest (min)</option>
+          </select>
+        </div>
+        <button class="primary" id="runBtn">Run all algorithms</button>
+      </div>
+      <div class="algo-pick">
+        <label><input type="checkbox" id="showDijkstra" checked> Dijkstra</label>
+        <label><input type="checkbox" id="showAstar" checked> A*</label>
+        <label><input type="checkbox" id="showBi" checked> Bidirectional</label>
+      </div>
+      <svg id="map" viewBox="0 0 520 420" role="img" aria-label="Map of the road network with the chosen route highlighted"></svg>
+      <div id="routeOut" class="result-box">Choose start and end, then run.</div>
+    </section>
+
+    <section class="card">
+      <h2>Algorithm comparison</h2>
+      <p class="muted" style="margin-top:0">Same query, three searches. Expanded / pushed / relaxed are real counters from the runs above — A* expands fewer nodes because its heuristic never overestimates.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>algorithm</th><th>cost</th><th>expanded</th><th>pushed</th><th>relaxed</th><th>peak frontier</th></tr></thead>
+          <tbody id="cmpBody">
+            <tr><td colspan="6" class="muted">No query yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="winnerNote" class="muted" style="margin-top:10px"></div>
+    </section>
+
+    <section class="card">
+      <h2>Why two cost models</h2>
+      <p>Minimising distance and minimising time are different questions. The same pair of intersections can differ by kilometres and half an hour — which is why <code class="mono">length</code> and <code class="mono">speed</code> are stored on every edge instead of being collapsed into one number at load time.</p>
+      <p>A* uses great-circle distance to the goal: no road beats the straight line, so the heuristic is admissible and A* returns the same route Dijkstra does — it just looks at less of the map. The travel-time heuristic divides by the <em>fastest speed anywhere in the graph</em>, not the road you are standing on, or a motorway ahead would make it overestimate.</p>
+      <div class="result-box">$ routeplanner compare n0202 n3737
+astar, fastest
+  50.19 km, 34.4 minutes, 22 segments
+  1,141 expanded, 1,443 pushed, 4,202 relaxed, peak frontier 208</div>
+    </section>
+
+    <footer>69 tests · Python 3.10–3.12 · standard library only · Built by <a href="https://github.com/umer-78">Umer Hashmi</a></footer>
+  </div>
+
+  <script>
+    // === Network: 5x5 grid, seeded edge classes ===
+    // nodes: n{row}{col}, coords in pseudo lat/lon, edges bidirectional with length (km) + speed (km/h)
+    const GRID = 5;
+    const nodes = {};
+    const nodeIds = [];
+    for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) {
+      const id = `n${r}${c}`;
+      nodes[id] = { id, r, c, lat: 31.40 + r * 0.045, lon: 74.20 + c * 0.05 };
+      nodeIds.push(id);
+    }
+    const edges = []; // {u,v,len,speed}
+    function haversine(a, b) {
+      const R = 6371, rad = Math.PI / 180;
+      const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+      const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(s));
+    }
+    // deterministic "thinning": drop some horizontal/vertical links, ring stays motorway
+    function edgeSpeed(r1, c1, r2, c2) {
+      const onRing = (r1 === 0 || r1 === GRID - 1 || c1 === 0 || c1 === GRID - 1)
+                  && (r2 === 0 || r2 === GRID - 1 || c2 === 0 || c2 === GRID - 1)
+                  && (r1 === r2 ? (r1 === 0 || r1 === GRID - 1) : (c1 === c2 ? (c1 === 0 || c1 === GRID - 1) : false));
+      if (onRing) return 100;
+      if (r1 % 2 === 0 && r2 % 2 === 0 && r1 === r2) return 60; // arterial rows
+      if (c1 % 2 === 0 && c2 % 2 === 0 && c1 === c2) return 60; // arterial cols
+      return 35;
+    }
+    let seed = 42;
+    function rand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) {
+      if (c + 1 < GRID) { // horizontal
+        const isRing = (r === 0 || r === GRID - 1);
+        if (isRing || rand() > 0.12) addEdge(`n${r}${c}`, `n${r}${c+1}`, edgeSpeed(r, c, r, c + 1));
+      }
+      if (r + 1 < GRID) { // vertical
+        const isRing = (c === 0 || c === GRID - 1);
+        if (isRing || rand() > 0.12) addEdge(`n${r}${c}`, `n${r+1}${c}`, edgeSpeed(r, c, r + 1, c));
+      }
+    }
+    function addEdge(u, v, speed) {
+      const len = haversine(nodes[u], nodes[v]);
+      edges.push({ u, v, len, speed });
+      edges.push({ u: v, v: u, len, speed });
+    }
+    const adj = {};
+    for (const id of nodeIds) adj[id] = [];
+    for (const e of edges) adj[e.u].push(e);
+
+    const maxSpeed = 100;
+    function edgeCost(e, model) {
+      if (model === 'time') return (e.len / e.speed) * 60; // minutes
+      return e.len; // km
+    }
+    // admissible heuristic: great-circle (time: distance / fastest speed anywhere)
+    function h(aId, bId, model) {
+      const d = haversine(nodes[aId], nodes[bId]);
+      if (model === 'time') return (d / maxSpeed) * 60;
+      return d;
+    }
+
+    // === One search function: Dijkstra is A* with zero h; bidirectional flag ===
+    class Heap {
+      constructor() { this.a = []; }
+      push(item, pri) {
+        this.a.push({ item, pri });
+        let i = this.a.length - 1;
+        while (i > 0) {
+          const p = (i - 1) >> 1;
+          if (this.a[p].pri <= this.a[i].pri) break;
+          [this.a[p], this.a[i]] = [this.a[i], this.a[p]]; i = p;
+        }
+      }
+      pop() {
+        if (!this.a.length) return null;
+        const top = this.a[0], last = this.a.pop();
+        if (this.a.length) {
+          this.a[0] = last;
+          let i = 0;
+          for (;;) {
+            const l = 2 * i + 1, r = l + 1; let m = i;
+            if (l < this.a.length && this.a[l].pri < this.a[m].pri) m = l;
+            if (r < this.a.length && this.a[r].pri < this.a[m].pri) m = r;
+            if (m === i) break;
+            [this.a[m], this.a[i]] = [this.a[i], this.a[m]]; i = m;
+          }
+        }
+        return top.item;
+      }
+      get size() { return this.a.length; }
+    }
+
+    function search(start, goal, model, algo) {
+      const useH = algo !== 'dijkstra';
+      const stats = { expanded: 0, pushed: 0, relaxed: 0, peakFrontier: 0 };
+      if (algo === 'bidirectional') return searchBi(start, goal, model, stats);
+
+      const dist = {}, prev = {}, done = new Set();
+      const pq = new Heap();
+      dist[start] = 0;
+      pq.push(start, useH ? h(start, goal, model) : 0);
+      stats.pushed = 1;
+      while (pq.size) {
+        const u = pq.pop();
+        if (done.has(u)) continue;
+        done.add(u);
+        stats.expanded++;
+        stats.peakFrontier = Math.max(stats.peakFrontier, pq.size);
+        if (u === goal) break;
+        for (const e of adj[u]) {
+          stats.relaxed++;
+          const nd = dist[u] + edgeCost(e, model);
+          if (dist[e.v] === undefined || nd < dist[e.v] - 1e-12) {
+            dist[e.v] = nd;
+            prev[e.v] = { from: u, edge: e };
+            const pri = useH ? nd + h(e.v, goal, model) : nd;
+            pq.push(e.v, pri);
+            stats.pushed++;
+          }
+        }
+      }
+      const path = [];
+      if (dist[goal] !== undefined) {
+        let cur = goal;
+        while (cur !== start) { const p = prev[cur]; path.unshift({ u: p.from, v: cur, edge: p.edge }); cur = p.from; }
+      }
+      return { cost: dist[goal], path, stats };
+    }
+
+    function searchBi(start, goal, model, stats) {
+      const fwd = { [start]: 0 }, bwd = { [goal]: 0 };
+      const fwdPrev = {}, bwdPrev = {};
+      const pqF = new Heap(), pqB = new Heap();
+      const doneF = new Set(), doneB = new Set();
+      pqF.push(start, 0); pqB.push(goal, 0);
+      stats.pushed = 2;
+      let best = Infinity, meet = null;
+
+      const neighbors = (id) => adj[id];
+      const revNeighbors = (id) => edges.filter(e => e.v === id); // edges into id
+
+      while (pqF.size && pqB.size) {
+        // expand the smaller tentative distance frontier
+        const df = pqF.size ? (fwd[/*peek via pop order*/ pqF.a[0].item] + 0) : Infinity;
+        const uf = pqF.a[0] ? pqF.a[0].item : null;
+        const ub = pqB.a[0] ? pqB.a[0].item : null;
+        const fPri = pqF.a[0] ? pqF.a[0].pri : Infinity;
+        const bPri = pqB.a[0] ? pqB.a[0].pri : Infinity;
+        const expandF = fPri <= bPri;
+        if (expandF) {
+          const u = pqF.pop();
+          if (!u || doneF.has(u)) { if (!u) break; continue; }
+          doneF.add(u);
+          stats.expanded++;
+          stats.peakFrontier = Math.max(stats.peakFrontier, pqF.size + pqB.size);
+          if (bwd[u] !== undefined) { best = Math.min(best, fwd[u] + bwd[u]); meet = meet || u; }
+          for (const e of adj[u]) {
+            stats.relaxed++;
+            const nd = fwd[u] + edgeCost(e, model);
+            if (fwd[e.v] === undefined || nd < fwd[e.v] - 1e-12) {
+              fwd[e.v] = nd; fwdPrev[e.v] = { from: u, edge: e };
+              pqF.push(e.v, nd); stats.pushed++;
+            }
+          }
+        } else {
+          const u = pqB.pop();
+          if (!u || doneB.has(u)) { if (!u) break; continue; }
+          doneB.add(u);
+          stats.expanded++;
+          stats.peakFrontier = Math.max(stats.peakFrontier, pqF.size + pqB.size);
+          if (fwd[u] !== undefined) { best = Math.min(best, fwd[u] + bwd[u]); meet = meet || u; }
+          for (const e of revNeighbors(u)) {
+            stats.relaxed++;
+            const nd = bwd[u] + edgeCost(e, model);
+            if (bwd[e.u] === undefined || nd < bwd[e.u] - 1e-12) {
+              bwd[e.u] = nd; bwdPrev[e.u] = { from: u, edge: e };
+              pqB.push(e.u, nd); stats.pushed++;
+            }
+          }
+        }
+        if (best !== Infinity && pqF.size + pqB.size > 0) {
+          // stop when both frontiers have met and top keys cannot beat best
+          if (meet && (pqF.a[0] ? pqF.a[0].pri : Infinity) + (pqB.a[0] ? pqB.a[0].pri : Infinity) >= best - 1e-9) break;
+        }
+      }
+      if (best === Infinity) return { cost: undefined, path: [], stats };
+      // reconstruct via meeting node discovered — re-run forward path to any node with fwd known meeting
+      // rebuild: find meeting node minimizing fwd+bwd
+      let m = null, mc = Infinity;
+      for (const k of Object.keys(fwd)) if (bwd[k] !== undefined && fwd[k] + bwd[k] < mc - 1e-12) { mc = fwd[k] + bwd[k]; m = k; }
+      const path = [];
+      if (m !== null) {
+        let cur = m;
+        while (cur !== start) { const p = fwdPrev[cur]; path.unshift({ u: p.from, v: cur, edge: p.edge }); cur = p.from; }
+        cur = m;
+        const tail = [];
+        while (cur !== goal) {
+          // bwdPrev[x] = { from: next toward goal, edge } where edge goes from from->x? we stored edge into u's predecessor direction
+          const p = bwdPrev[cur];
+          tail.push({ u: p.from, v: cur, edge: p.edge }); // edge stored is from p.from -> ... actually rev edge: e.v===u so e goes p.from -> cur? careful:
+          cur = p.from;
+        }
+        // bwdPrev[cur] when walking from m toward goal: for u expanded in backward search, for e with e.v=u, we set bwdPrev[e.u]={from:u, edge:e}. So from cur, p.from is the node closer to goal, edge is p.from->cur. So tail edge direction is goal-ward reversed: the forward step is cur -> p.from? No: edge e has e.u = predecessor-in-backward = closer to goal? Wait: backward expands from goal; e.v = u (being expanded, closer to goal in backward terms means further from goal in forward?). Backward dist = cost from goal to node. e: e.v=u, e.u = prev, bwd[e.u] = bwd[u]+cost(e). e.u is farther from goal. Edge e goes e.u -> e.v i.e. farther -> closer to goal. Walking m toward goal: from cur, we want next = e.u? No.
+        // bwdPrev[e.u] = { from: u, edge: e } with e.v=u, e.u=prev. So for key prev, from=u (next closer to goal), edge = prev->u. So forward path: cur -> p.from with edge p.edge. Correct:
+        let cur2 = m;
+        const tail2 = [];
+        while (cur2 !== goal) {
+          const p = bwdPrev[cur2];
+          tail2.push({ u: cur2, v: p.from, edge: p.edge });
+          cur2 = p.from;
+        }
+        for (const s of tail2) path.push(s);
+        return { cost: mc, path, stats };
+      }
+      return { cost: best, path: [], stats };
+    }
+
+    // === UI ===
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n, d = 2) => n === undefined ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+    const fmtInt = (n) => n.toLocaleString('en-US');
+
+    for (const id of nodeIds) {
+      const o1 = document.createElement('option'); o1.value = id; o1.textContent = id;
+      const o2 = o1.cloneNode(true);
+      $('startSel').appendChild(o1); $('endSel').appendChild(o2);
+    }
+    $('startSel').value = 'n00'; $('endSel').value = 'n44';
+
+    const NS = 'http://www.w3.org/2000/svg';
+    function sx(lon) { return 40 + (lon - 74.18) / 0.26 * 440; }
+    function sy(lat) { return 380 - (lat - 31.38) / 0.24 * 340; }
+
+    function drawMap(highlights) {
+      const svg = $('map');
+      svg.innerHTML = '';
+      // edges
+      const drawn = new Set();
+      for (const e of edges) {
+        const key = [e.u, e.v].sort().join('-');
+        if (drawn.has(key)) continue;
+        drawn.add(key);
+        const a = nodes[e.u], b = nodes[e.v];
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', sx(a.lon)); line.setAttribute('y1', sy(a.lat));
+        line.setAttribute('x2', sx(b.lon)); line.setAttribute('y2', sy(b.lat));
+        line.setAttribute('stroke', e.speed === 100 ? 'var(--accent)' : e.speed === 60 ? 'var(--muted)' : 'var(--border)');
+        line.setAttribute('stroke-width', e.speed === 100 ? 3 : e.speed === 60 ? 2 : 1.5);
+        line.setAttribute('opacity', '0.7');
+        svg.appendChild(line);
+      }
+      // highlighted path (first enabled algo)
+      const colors = { dijkstra: 'var(--bad)', astar: 'var(--good)', bidirectional: '#d97706' };
+      let order = 0;
+      for (const [algo, res] of Object.entries(highlights)) {
+        if (!res || !res.path.length) continue;
+        const color = colors[algo];
+        const dash = order === 0 ? '' : order === 1 ? '6 4' : '2 4';
+        for (const seg of res.path) {
+          const a = nodes[seg.u], b = nodes[seg.v];
+          const line = document.createElementNS(NS, 'line');
+          line.setAttribute('x1', sx(a.lon)); line.setAttribute('y1', sy(a.lat));
+          line.setAttribute('x2', sx(b.lon)); line.setAttribute('y2', sy(b.lat));
+          line.setAttribute('stroke', color); line.setAttribute('stroke-width', 4);
+          line.setAttribute('stroke-linecap', 'round');
+          if (dash) line.setAttribute('stroke-dasharray', dash);
+          svg.appendChild(line);
+        }
+        order++;
+      }
+      // nodes
+      for (const id of nodeIds) {
+        const n = nodes[id];
+        const isStart = id === $('startSel').value;
+        const isEnd = id === $('endSel').value;
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('cx', sx(n.lon)); c.setAttribute('cy', sy(n.lat));
+        c.setAttribute('r', isStart || isEnd ? 8 : 5);
+        c.setAttribute('fill', isStart ? 'var(--good)' : isEnd ? 'var(--bad)' : 'var(--surface)');
+        c.setAttribute('stroke', 'var(--text)'); c.setAttribute('stroke-width', 1.5);
+        svg.appendChild(c);
+        if (isStart || isEnd) {
+          const t = document.createElementNS(NS, 'text');
+          t.setAttribute('x', sx(n.lon)); t.setAttribute('y', sy(n.lat) - 12);
+          t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '11');
+          t.setAttribute('fill', 'var(--text)');
+          t.textContent = isStart ? 'start' : 'end';
+          svg.appendChild(t);
+        }
+      }
+    }
+
+    function run() {
+      const start = $('startSel').value, goal = $('endSel').value, model = $('costSel').value;
+      if (start === goal) { $('routeOut').textContent = 'Start and end are the same node.'; return; }
+      const algos = [
+        ['dijkstra', $('showDijkstra').checked],
+        ['astar', $('showAstar').checked],
+        ['bidirectional', $('showBi').checked],
+      ].filter(([, on]) => on).map(([a]) => a);
+      if (!algos.length) { $('routeOut').textContent = 'Enable at least one algorithm.'; return; }
+
+      const results = {};
+      for (const a of algos) results[a] = search(start, goal, model, a);
+
+      drawMap(results);
+
+      const unit = model === 'time' ? 'min' : 'km';
+      let out = `${model === 'time' ? 'fastest' : 'shortest'} · ${start} → ${goal}\n\n`;
+      for (const a of algos) {
+        const r = results[a];
+        if (r.cost === undefined) { out += `${a.padEnd(15)} no route found\n`; continue; }
+        const roads = r.path.map(s => model === 'time'
+          ? fmt((s.edge.len / s.edge.speed) * 60, 1) + ' min @' + s.edge.speed
+          : fmt(s.edge.len, 2) + ' km @' + s.edge.speed);
+        out += `${a.padEnd(15)} ${fmt(r.cost)} ${unit} · ${r.path.length} segments\n`;
+        out += '  ' + r.path.map((s, i) => `${s.u}→${s.v} (${roads[i]})`).join(', ') + '\n\n';
+      }
+      $('routeOut').textContent = out.trimEnd();
+
+      // comparison table
+      const costs = algos.map(a => results[a].cost).filter(c => c !== undefined);
+      const best = costs.length ? Math.min(...costs) : undefined;
+      $('cmpBody').innerHTML = algos.map(a => {
+        const r = results[a];
+        const isBest = r.cost !== undefined && Math.abs(r.cost - best) < 1e-9;
+        return `<tr>
+          <td>${a}${isBest ? ' <span class="badge">optimal</span>' : ''}</td>
+          <td class="mono ${isBest ? 'best' : ''}">${fmt(r.cost)} ${unit}</td>
+          <td class="mono">${fmtInt(r.stats.expanded)}</td>
+          <td class="mono">${fmtInt(r.stats.pushed)}</td>
+          <td class="mono">${fmtInt(r.stats.relaxed)}</td>
+          <td class="mono">${fmtInt(r.stats.peakFrontier)}</td>
+        </tr>`;
+      }).join('');
+
+      const dij = results.dijkstra, ast = results.astar;
+      if (dij && ast && dij.cost !== undefined && ast.cost !== undefined) {
+        const same = Math.abs(dij.cost - ast.cost) < 1e-9;
+        $('winnerNote').innerHTML = same
+          ? `A* returns the <b>same cost</b> as Dijkstra (${fmt(ast.cost)} ${unit}) while expanding <b>${fmtInt(dij.stats.expanded)}</b> → <b>${fmtInt(ast.stats.expanded)}</b> nodes — the heuristic never overestimates, so it is exact and cheaper.`
+          : `Costs differ (${fmt(dij.cost)} vs ${fmt(ast.cost)}) — that should not happen with an admissible heuristic; something is wrong.`;
+      } else {
+        $('winnerNote').textContent = 'Enable Dijkstra and A* to see the admissibility claim checked.';
+      }
+    }
+
+    $('runBtn').addEventListener('click', run);
+    ['startSel', 'endSel', 'costSel', 'showDijkstra', 'showAstar', 'showBi'].forEach(id =>
+      $(id).addEventListener('change', () => { drawMap({}); run(); }));
+    drawMap({});
+    run();
+  </script>
+</body>
+</html>
