@@ -1,5 +1,9 @@
 # routeplanner
 
+[![CI](https://github.com/umer-78/route-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/route-planner/actions/workflows/ci.yml)
+
+**Live demo:** https://umer-78.github.io/route-planner/
+
 Shortest and fastest routes over a road network, written from scratch in Python
 with no dependencies. Dijkstra, A* and bidirectional search over one
 implementation, two cost models that genuinely disagree, and search statistics
