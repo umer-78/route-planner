@@ -1388,9 +1388,9 @@ astar, fastest
     function demoOwn() {
       labStop();
       labNodes = {}; labEdges = []; labSeq = 0;
-      setLabMode('addn');
       refreshLabSelects();
-      labRebuildTraces(); drawLab();
+      labRebuildTraces();
+      setLabMode('addn'); // redraws, so the stale traces must be cleared first
       $('labOut').textContent = 'Construct-your-own mode: click the canvas to add nodes, then switch to Edge mode and click two nodes to connect them.';
     }
 
