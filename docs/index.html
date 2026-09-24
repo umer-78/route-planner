@@ -396,9 +396,22 @@ svg text { font-family: var(--mono); }
 .lab-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .warn-note { color: var(--warn); font-size: 13px; margin-top: 8px; font-weight: 600; }
 @media (max-width: 560px) { .race-lane { grid-template-columns: 90px 1fr; } .race-lane .rl-count { grid-column: 1 / -1; text-align: left; } }
-  </style>
+  
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <main id="main">
+
   <div class="wrap">
     <header class="top">
       <div class="brand">
@@ -432,7 +445,7 @@ svg text { font-family: var(--mono); }
             <option value="time">fastest (min)</option>
           </select>
         </div>
-        <button class="primary" id="runBtn">Run all algorithms</button>
+        <button class="primary" id="runBtn" type="button">Run all algorithms</button>
       </div>
       <div class="algo-pick">
         <label><input type="checkbox" id="showDijkstra" checked> Dijkstra</label>
@@ -494,17 +507,17 @@ astar, fastest
         </div>
       </div>
       <div class="lab-tools">
-        <button class="primary" id="labPlay">▶ Play</button>
-        <button id="labStep">Step</button>
-        <button id="labReset">Reset</button>
-        <button id="labModeMove" class="mode-active">✋ Move nodes</button>
-        <button id="labModeAddN">＋ Node</button>
-        <button id="labModeAddE">⌒ Edge</button>
-        <button id="labModeDel">✕ Delete</button>
-        <button id="labRandomize">Randomize graph</button>
-        <button id="labDemoDead">Dead-end demo</button>
-        <button id="labDemoNoPath">No-path demo</button>
-        <button id="labDemoOwn">Construct own</button>
+        <button class="primary" id="labPlay" type="button">▶ Play</button>
+        <button id="labStep" type="button">Step</button>
+        <button id="labReset" type="button">Reset</button>
+        <button id="labModeMove" class="mode-active" type="button">✋ Move nodes</button>
+        <button id="labModeAddN" type="button">＋ Node</button>
+        <button id="labModeAddE" type="button">⌒ Edge</button>
+        <button id="labModeDel" type="button">✕ Delete</button>
+        <button id="labRandomize" type="button">Randomize graph</button>
+        <button id="labDemoDead" type="button">Dead-end demo</button>
+        <button id="labDemoNoPath" type="button">No-path demo</button>
+        <button id="labDemoOwn" type="button">Construct own</button>
       </div>
       <div class="presets">
         <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--text-secondary)"><input type="checkbox" id="showF" checked> color by f(n)</label>
@@ -1465,5 +1478,7 @@ astar, fastest
     labRebuildTraces();
     drawLab();
   </script>
-</body>
+
+  </main>
+  </body>
 </html>
