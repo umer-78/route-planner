@@ -159,7 +159,7 @@ def haversine(a: Node, b: Node) -> float:
     Straight-line distance on a sphere, which is what makes it a *lower bound*
     on any road distance and therefore an admissible A* heuristic. Euclidean
     distance on raw latitude and longitude is not: a degree of longitude is
-    111 km at the equator and 78 km in Lahore, so it overestimates east-west
+    111 km at the equator and 95 km in Lahore, so it overestimates east-west
     distance away from the equator and A* stops being exact.
     """
     lat1, lon1 = math.radians(a.lat), math.radians(a.lon)
