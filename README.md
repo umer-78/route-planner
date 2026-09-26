@@ -1,4 +1,4 @@
-# routeplanner
+# routeplanner: shortest and fastest routes
 
 [![CI](https://github.com/umer-78/route-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/route-planner/actions/workflows/ci.yml)
 

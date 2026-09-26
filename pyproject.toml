@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "routeplanner"
+name = "route-planner"
 version = "1.0.0"
-description = "Shortest and fastest routes over a road network: Dijkstra, A* and bidirectional search, with the search statistics to compare them."
+description = "Shortest and fastest routes over a road network: Dijkstra, A* and bidirectional search with the search statistics to compare them. No dependencies."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Umer Hashmi" }]
