@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/umer-78/route-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/route-planner/actions/workflows/ci.yml)
 
+[![Route Planner: the live demo](.github/preview.jpg)](https://umer-78.github.io/route-planner/)
+
 **Live demo:** https://umer-78.github.io/route-planner/
 
 Shortest and fastest routes over a road network, written from scratch in Python
