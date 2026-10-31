@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import random
 import statistics
@@ -30,8 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
     route.add_argument("--fastest", action="store_true", help="minimise time rather than distance")
     route.add_argument("-a", "--algorithm", default="astar",
                        choices=["astar", "dijkstra", "bidirectional"])
-    route.add_argument("-w", "--weight", type=float, default=1.0,
-                       help="inflate the heuristic; above 1.0 it stops being admissible")
+    route.add_argument("-w", "--weight", type=non_negative, default=1.0,
+                       help="inflate the heuristic; above 1.0 it stops being admissible, 0 is Dijkstra")
     route.add_argument("--no-reopen", action="store_true",
                        help="close nodes permanently, as most tutorials do")
 
@@ -41,20 +42,55 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--fastest", action="store_true")
 
     weights = sub.add_parser("weights", help="what inflating the heuristic costs and saves")
-    weights.add_argument("-p", "--pairs", type=int, default=40)
+    weights.add_argument("-p", "--pairs", type=positive_int, default=40)
     weights.add_argument("-s", "--seed", type=int, default=1)
 
     bench = sub.add_parser("bench", help="average expansions over random pairs")
-    bench.add_argument("-p", "--pairs", type=int, default=100)
+    bench.add_argument("-p", "--pairs", type=positive_int, default=100)
     bench.add_argument("-s", "--seed", type=int, default=1)
 
     sub.add_parser("stats", help="what is in the network")
 
     near = sub.add_parser("nearest", help="the nearest intersection to a coordinate")
-    near.add_argument("lat", type=float)
-    near.add_argument("lon", type=float)
+    near.add_argument("lat", type=latitude)
+    near.add_argument("lon", type=longitude)
 
     return parser
+
+
+# Argument types: a bad value is refused by argparse with a usage line,
+# instead of running and printing nonsense (a negative heuristic, a point
+# 12,500 km off the map, an empty benchmark).
+def _number(text: str, check, what: str) -> float:
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number") from None
+    if not math.isfinite(value) or not check(value):
+        raise argparse.ArgumentTypeError(f"{text} is not {what}")
+    return value
+
+
+def non_negative(text: str) -> float:
+    return _number(text, lambda v: v >= 0, "a number of 0 or more")
+
+
+def latitude(text: str) -> float:
+    return _number(text, lambda v: -90 <= v <= 90, "a latitude (-90 to 90)")
+
+
+def longitude(text: str) -> float:
+    return _number(text, lambda v: -180 <= v <= 180, "a longitude (-180 to 180)")
+
+
+def positive_int(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{text} is not 1 or more")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,7 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print(file=sys.stderr)
         return 130
-    except (KeyError, ValueError, FileNotFoundError) as error:
+    except KeyError as error:
+        # str(KeyError) quotes its message; show the message itself
+        message = error.args[0] if error.args else "unknown node"
+        print(f"routeplanner: {message} (find one with `routeplanner nearest LAT LON`)", file=sys.stderr)
+        return 2
+    except (ValueError, FileNotFoundError) as error:
         print(f"routeplanner: {error}", file=sys.stderr)
         return 2
 
@@ -156,12 +197,16 @@ def _run(argv: list[str] | None) -> int:
             print(f"{name:<16}{result.stats.expanded:>10,}{result.stats.pushed:>10,}"
                   f"{result.stats.frontier_peak:>8,}{result.route.cost:>14.3f}")
 
+        if not all(result.found for _, result in runs):
+            print("\nno route between these nodes" if not any(result.found for _, result in runs)
+                  else "\nthe algorithms disagree on whether a route exists: this is a bug")
+            return 1
         costs = {round(result.route.cost, 6) for _, result in runs}
-        print(f"\nall three agree on the cost: {len(costs) == 1}")
+        print(f"\nall three agree on the cost: {'yes' if len(costs) == 1 else 'NO (this is a bug)'}")
         baseline = runs[0][1].stats.expanded
         for name, result in runs[1:]:
-            print(f"{name} expanded {baseline / result.stats.expanded:.2f}x fewer nodes than dijkstra")
-        return 0
+            print(f"{name}: {expansion_change(baseline, result.stats.expanded)} than dijkstra")
+        return 0 if len(costs) == 1 else 1
 
     if args.cmd == "weights":
         pairs = sample_pairs(graph, args.pairs, args.seed)
@@ -203,9 +248,21 @@ def _run(argv: list[str] | None) -> int:
     return 0
 
 
+def expansion_change(baseline: int, expanded: int) -> str:
+    """'40% fewer nodes expanded' or '12% more', never a misleading '0.9x fewer'."""
+    if expanded == 0 or baseline == 0:
+        return "no nodes expanded" if expanded == 0 else f"{expanded:,} nodes expanded"
+    change = 1 - expanded / baseline
+    if abs(change) < 0.005:
+        return "about as many nodes expanded"
+    return f"{abs(change):.0%} {'fewer' if change > 0 else 'more'} nodes expanded"
+
+
 def sample_pairs(graph: Graph, count: int, seed: int) -> list[tuple[str, str]]:
     rng = random.Random(seed)
     ids = sorted(graph.nodes)
+    if len(ids) < 2:
+        raise ValueError("the network needs at least two intersections to sample routes")
     pairs = []
     while len(pairs) < count:
         start, goal = rng.choice(ids), rng.choice(ids)

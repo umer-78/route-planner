@@ -48,6 +48,13 @@ class Graph:
     # -- building ---------------------------------------------------------
 
     def add_node(self, node: Node) -> None:
+        if not node.id:
+            raise ValueError("a node needs an id")
+        if not (math.isfinite(node.lat) and math.isfinite(node.lon)
+                and -90 <= node.lat <= 90 and -180 <= node.lon <= 180):
+            raise ValueError(f"node {node.id!r} has impossible coordinates ({node.lat}, {node.lon})")
+        if node.id in self.nodes:
+            raise ValueError(f"node {node.id!r} is defined twice")
         self.nodes[node.id] = node
         self.out.setdefault(node.id, [])
         self.into.setdefault(node.id, [])
@@ -56,10 +63,11 @@ class Graph:
         for end in (edge.source, edge.target):
             if end not in self.nodes:
                 raise KeyError(f"edge refers to unknown node {end!r}")
-        if edge.length < 0:
-            raise ValueError("an edge cannot be shorter than nothing")
-        if edge.speed <= 0:
-            raise ValueError("an edge needs a positive speed")
+        # NaN slips past `< 0`, and a NaN cost silently breaks the heap order
+        if not math.isfinite(edge.length) or edge.length < 0:
+            raise ValueError(f"edge {edge.source}->{edge.target} needs a finite length of 0 or more")
+        if not math.isfinite(edge.speed) or edge.speed <= 0:
+            raise ValueError(f"edge {edge.source}->{edge.target} needs a finite, positive speed")
         self.out[edge.source].append(edge)
         self.into[edge.target].append(edge)
 
@@ -141,15 +149,31 @@ class Graph:
         directory = Path(directory)
         graph = cls()
 
-        with (directory / "nodes.csv").open(encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                graph.add_node(Node(row["id"], float(row["lat"]), float(row["lon"]),
-                                    row.get("name", "")))
+        # A bad row names its file and line instead of failing with a bare
+        # "could not convert string to float".
+        def rows(name: str, columns: tuple[str, ...]):
+            with (directory / name).open(encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                missing = [c for c in columns if c not in (reader.fieldnames or [])]
+                if missing:
+                    raise ValueError(f"{name}: missing column(s) {', '.join(missing)}")
+                for row in reader:
+                    yield reader.line_num, row
 
-        with (directory / "edges.csv").open(encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                graph.add_edge(Edge(row["source"], row["target"], float(row["length_km"]),
-                                    float(row["speed_kph"]), row.get("name", "")))
+        for line, row in rows("nodes.csv", ("id", "lat", "lon")):
+            try:
+                graph.add_node(Node(row["id"].strip(), float(row["lat"]), float(row["lon"]),
+                                    (row.get("name") or "").strip()))
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"nodes.csv line {line}: {error}") from None
+
+        for line, row in rows("edges.csv", ("source", "target", "length_km", "speed_kph")):
+            try:
+                graph.add_edge(Edge(row["source"].strip(), row["target"].strip(), float(row["length_km"]),
+                                    float(row["speed_kph"]), (row.get("name") or "").strip()))
+            except (TypeError, ValueError, KeyError) as error:
+                message = error.args[0] if isinstance(error, KeyError) and error.args else error
+                raise ValueError(f"edges.csv line {line}: {message}") from None
         return graph
 
 

@@ -110,7 +110,7 @@ def test_a_negative_length_is_rejected():
     graph = Graph()
     for name in "ab":
         graph.add_node(Node(name, 31.0, 74.0))
-    with pytest.raises(ValueError, match="shorter than nothing"):
+    with pytest.raises(ValueError, match="finite length of 0 or more"):
         graph.add_edge(Edge("a", "b", -1.0, 50.0))
 
 
@@ -213,3 +213,39 @@ def test_route_length_and_time_agree_with_its_edges(city):
     route = astar(city, "n0505", "n2525").route
     assert route.length_km == pytest.approx(sum(e.length for e in route.edges))
     assert route.minutes == pytest.approx(sum(e.minutes for e in route.edges))
+
+
+@pytest.mark.parametrize("length,speed", [(float("nan"), 50.0), (1.0, float("nan")), (float("inf"), 50.0), (1.0, 0.0)])
+def test_non_finite_edges_are_rejected(length, speed):
+    graph = Graph()
+    for name in "ab":
+        graph.add_node(Node(name, 31.0, 74.0))
+    with pytest.raises(ValueError):
+        graph.add_edge(Edge("a", "b", length, speed))
+
+
+@pytest.mark.parametrize("lat,lon", [(91.0, 0.0), (0.0, -181.0), (float("nan"), 0.0)])
+def test_impossible_coordinates_are_rejected(lat, lon):
+    with pytest.raises(ValueError, match="impossible coordinates"):
+        Graph().add_node(Node("x", lat, lon))
+
+
+def test_a_duplicate_node_is_rejected():
+    graph = Graph()
+    graph.add_node(Node("a", 1.0, 1.0))
+    with pytest.raises(ValueError, match="defined twice"):
+        graph.add_node(Node("a", 2.0, 2.0))
+
+
+def test_a_bad_csv_row_names_its_file_and_line(tmp_path):
+    (tmp_path / "nodes.csv").write_text("id,lat,lon,name\na,31.0,74.0,\nb,north,74.1,\n", encoding="utf-8")
+    (tmp_path / "edges.csv").write_text("source,target,length_km,speed_kph,name\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="nodes.csv line 3"):
+        Graph.load(tmp_path)
+
+
+def test_a_missing_column_is_reported(tmp_path):
+    (tmp_path / "nodes.csv").write_text("id,lat\na,31.0\n", encoding="utf-8")
+    (tmp_path / "edges.csv").write_text("source,target,length_km,speed_kph\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="missing column"):
+        Graph.load(tmp_path)

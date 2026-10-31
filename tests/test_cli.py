@@ -75,8 +75,8 @@ def test_the_shortest_route_is_not_unique(capsys):
 def test_compare(capsys):
     code, out, _ = invoke(capsys, "compare", "n0505", "n3030")
     assert code == 0
-    assert "all three agree on the cost: True" in out
-    assert "fewer nodes than dijkstra" in out
+    assert "all three agree on the cost: yes" in out
+    assert "nodes expanded than dijkstra" in out
 
 
 def test_compare_on_travel_time(capsys):
@@ -135,3 +135,30 @@ def test_version(capsys):
     with pytest.raises(SystemExit) as exit_:
         main(["--version"])
     assert exit_.value.code == 0
+
+
+def test_compare_with_the_same_start_and_goal(capsys):
+    # bidirectional expands nothing here; the ratio used to divide by zero
+    code, out, _ = invoke(capsys, "compare", "n0202", "n0202")
+    assert code == 0
+    assert "no nodes expanded" in out
+
+
+@pytest.mark.parametrize("argv", [
+    ["route", "n0000", "n0001", "-w", "-1"],
+    ["route", "n0000", "n0001", "-w", "nan"],
+    ["bench", "-p", "0"],
+    ["weights", "-p", "-3"],
+    ["nearest", "91", "0"],
+    ["nearest", "0", "181"],
+])
+def test_bad_arguments_are_refused_with_a_usage_error(argv):
+    with pytest.raises(SystemExit) as stop:
+        main([*NETWORK, *argv])
+    assert stop.value.code == 2
+
+
+def test_an_unknown_node_is_named_plainly(capsys):
+    code, _, err = invoke(capsys, "route", "n0000", "nope")
+    assert code == 2
+    assert "unknown goal node 'nope'" in err and '"' not in err

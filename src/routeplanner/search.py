@@ -9,6 +9,7 @@ with like.
 from __future__ import annotations
 
 import heapq
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -151,6 +152,8 @@ def astar(graph: Graph, start: str, goal: str, *, cost: CostModel = by_distance,
     gets greedier and finishes sooner, and the path it returns is no longer
     guaranteed shortest. The README measures both halves of that trade.
     """
+    if not math.isfinite(weight) or weight < 0:
+        raise ValueError("the heuristic weight must be a finite number of 0 or more")
     return search(graph, start, goal, cost=cost,
                   heuristic=straight_line(graph, cost, weight), reopen=reopen)
 
@@ -184,8 +187,10 @@ def bidirectional(graph: Graph, start: str, goal: str, *,
     smallest keys together exceed the best complete path found so far, and every
     edge relaxed before then has to be checked against it.
     """
-    if start not in graph.nodes or goal not in graph.nodes:
-        raise KeyError("unknown node")
+    if start not in graph.nodes:
+        raise KeyError(f"unknown start node {start!r}")
+    if goal not in graph.nodes:
+        raise KeyError(f"unknown goal node {goal!r}")
     stats = Stats()
 
     if start == goal:

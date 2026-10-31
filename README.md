@@ -39,7 +39,7 @@ astar, fastest
 git clone https://github.com/umer-78/route-planner.git
 cd route-planner
 pip install -e ".[dev]"
-pytest -q                          # 69 tests
+pytest -q                          # 87 tests
 
 routeplanner stats
 routeplanner route   n0202 n3737              # shortest
@@ -47,8 +47,13 @@ routeplanner route   n0202 n3737 --fastest    # fastest
 routeplanner compare n0202 n3737              # every algorithm, side by side
 routeplanner weights                          # what inflating the heuristic costs
 routeplanner bench
-routeplanner nearest 31.45 74.25
+routeplanner nearest 31.45 74.25          # find a node id near a coordinate
 ```
+
+Exit codes: `0` a route was found, `1` no route (or the algorithms disagree,
+which would be a bug), `2` bad input — an unknown node, a negative heuristic
+weight, a coordinate off the globe, or a malformed `nodes.csv`/`edges.csv` row,
+reported with its file and line number.
 
 ## The fastest route is 3.6 km longer and half an hour quicker
 
@@ -238,7 +243,7 @@ ways nobody tracked.
 
 ```
 $ pytest -q
-69 passed
+87 passed
 ```
 
 The ones that matter are the ones that would pass against a wrong
@@ -248,6 +253,11 @@ zero re-expansions, that an admissible-but-inconsistent one needs them, that
 mild inflation is *slower*, and that bidirectional search does not stop at the
 first node both frontiers have touched — the first meeting point is not
 necessarily on the shortest path.
+
+The rest guard the edges: a start equal to the goal (bidirectional search
+expands nothing, which used to divide by zero in `compare`), NaN or infinite
+lengths and speeds (NaN slips past a `< 0` check and silently corrupts the
+heap order), impossible coordinates, duplicate nodes, and bad CSV rows.
 
 ## Licence
 
